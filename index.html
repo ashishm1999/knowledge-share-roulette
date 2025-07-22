@@ -430,11 +430,9 @@
     </div>
 
     <script>
-        // Use JSONBin.io for real-time data sharing (no setup required)
-        const API_BASE = 'https://api.jsonbin.io/v3/b';
-        const BIN_ID = '6756c8d1e41b4d34e4621b33'; // Public bin for knowledge share roulette
-        
-        let cloudSyncEnabled = true;
+        // Simple cloud storage using a free service
+        const STORAGE_URL = 'https://api.jsonbin.io/v3/b/67576a4ae41b4d34e46239c2';
+        let isCloudWorking = false;
         class DateRoulette {
             constructor() {
                 // Start date: August 11, 2025 (Monday)
@@ -454,99 +452,115 @@
 
             async loadFromCloud() {
                 try {
-                    console.log('Loading data from cloud...');
-                    const response = await fetch(`${API_BASE}/${BIN_ID}/latest`);
+                    console.log('Attempting to load from cloud...');
+                    const response = await fetch(STORAGE_URL + '/latest');
                     
                     if (response.ok) {
                         const data = await response.json();
-                        if (data.record && typeof data.record === 'object') {
+                        console.log('Cloud response:', data);
+                        
+                        if (data.record && Object.keys(data.record).length > 0) {
                             this.assignments = data.record;
-                            console.log('Loaded from cloud:', this.assignments);
+                            console.log('Successfully loaded from cloud:', this.assignments);
+                            isCloudWorking = true;
                             
                             // Save to localStorage as backup
                             localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                            return;
                         }
-                    } else {
-                        console.log('Cloud data not available, using localStorage');
-                        this.loadFromLocalStorage();
                     }
+                    
+                    // If no cloud data, fall back to localStorage or default
+                    console.log('No cloud data found, using fallback');
+                    this.loadFallbackData();
+                    
                 } catch (error) {
-                    console.log('Error loading from cloud, using localStorage:', error);
-                    this.loadFromLocalStorage();
-                    cloudSyncEnabled = false;
+                    console.log('Cloud load failed:', error);
+                    this.loadFallbackData();
                 }
             }
 
-            loadFromLocalStorage() {
+            loadFallbackData() {
                 const savedData = localStorage.getItem('dateRouletteAssignments');
                 if (savedData) {
-                    this.assignments = JSON.parse(savedData);
+                    try {
+                        this.assignments = JSON.parse(savedData);
+                        console.log('Loaded from localStorage:', this.assignments);
+                    } catch (e) {
+                        console.log('localStorage parse error:', e);
+                        this.setDefaultData();
+                    }
                 } else {
-                    // Initialize with CJ's assignment to Aug 11
-                    this.assignments = {
-                        'CJ': new Date('2025-08-11').toDateString()
-                    };
+                    this.setDefaultData();
                 }
-                console.log('Loaded from localStorage:', this.assignments);
+            }
+
+            setDefaultData() {
+                // Initialize with CJ's assignment to Aug 11
+                this.assignments = {
+                    'CJ': 'Mon Aug 11 2025'
+                };
+                console.log('Set default data:', this.assignments);
+                this.saveToCloud();
             }
 
             async saveToCloud() {
-                if (!cloudSyncEnabled) {
-                    this.saveToLocalStorage();
-                    return;
-                }
+                // Always save to localStorage first
+                localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                console.log('Saved to localStorage:', this.assignments);
 
                 try {
-                    console.log('Saving to cloud:', this.assignments);
-                    const response = await fetch(`${API_BASE}/${BIN_ID}`, {
+                    console.log('Attempting to save to cloud:', this.assignments);
+                    
+                    const response = await fetch(STORAGE_URL, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json',
+                            'X-Master-Key': '$2a$10$6lTwQVGmC4P5HuTq8wLNpOUeFqL3kW9iZBzCPkYXzTv6RnO1P4HZS'
                         },
                         body: JSON.stringify(this.assignments)
                     });
 
                     if (response.ok) {
-                        console.log('Successfully saved to cloud');
-                        localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                        const result = await response.json();
+                        console.log('Successfully saved to cloud:', result);
+                        isCloudWorking = true;
+                        this.updateSyncStatus('🟢 Synced to cloud');
                     } else {
-                        console.log('Cloud save failed, using localStorage');
-                        this.saveToLocalStorage();
+                        console.log('Cloud save failed with status:', response.status);
+                        this.updateSyncStatus('🟡 Local storage only');
                     }
                 } catch (error) {
                     console.log('Error saving to cloud:', error);
-                    this.saveToLocalStorage();
+                    this.updateSyncStatus('🟡 Local storage only');
                 }
             }
 
-            saveToLocalStorage() {
-                localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
-                console.log('Saved to localStorage:', this.assignments);
-            }
-
             startCloudSync() {
-                if (!cloudSyncEnabled) return;
-                
-                // Poll for updates every 3 seconds
+                // Poll for updates every 5 seconds
                 setInterval(async () => {
                     try {
-                        const response = await fetch(`${API_BASE}/${BIN_ID}/latest`);
+                        const response = await fetch(STORAGE_URL + '/latest');
                         if (response.ok) {
                             const data = await response.json();
+                            
                             if (data.record && JSON.stringify(data.record) !== JSON.stringify(this.assignments)) {
-                                console.log('Received update from cloud:', data.record);
+                                console.log('Received cloud update:', data.record);
                                 this.assignments = data.record;
-                                this.updateUI();
                                 
-                                // Update status indicator
-                                this.updateSyncStatus('🟢 Synced with cloud');
+                                // Save to localStorage
+                                localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                                
+                                // Update UI
+                                this.updateUI();
+                                this.updateSyncStatus('🟢 Updated from cloud');
                             }
                         }
                     } catch (error) {
                         console.log('Sync check failed:', error);
-                        this.updateSyncStatus('🟡 Using local storage');
+                        this.updateSyncStatus('🟡 Local storage only');
                     }
-                }, 3000);
+                }, 5000);
             }
 
             updateSyncStatus(message) {
@@ -633,8 +647,8 @@
                 
                 // Set initial sync status
                 setTimeout(() => {
-                    this.updateSyncStatus(cloudSyncEnabled ? '🟢 Cloud sync active' : '🟡 Using local storage');
-                }, 1000);
+                    this.updateSyncStatus(isCloudWorking ? '🟢 Cloud sync active' : '🟡 Local storage only');
+                }, 2000);
             }
 
             getAllDates() {
@@ -657,14 +671,19 @@
                 const takenDateStrings = Object.values(this.assignments);
                 
                 console.log('All dates:', allDates.map(d => d.toDateString()));
-                console.log('Taken dates (raw values):', takenDateStrings);
+                console.log('Taken date strings:', takenDateStrings);
                 
                 // Filter out dates that have been assigned
                 const available = allDates.filter(date => {
                     const dateString = date.toDateString();
-                    const isAvailable = !takenDateStrings.includes(dateString);
-                    console.log(`${dateString}: ${isAvailable ? 'Available' : 'Taken'}`);
-                    return isAvailable;
+                    const isTaken = takenDateStrings.some(takenDate => {
+                        // Handle different date formats
+                        const normalizedTaken = new Date(takenDate).toDateString();
+                        return normalizedTaken === dateString;
+                    });
+                    
+                    console.log(`${dateString}: ${isTaken ? 'TAKEN' : 'Available'}`);
+                    return !isTaken;
                 });
                 
                 console.log('Available dates:', available.map(d => d.toDateString()));
