@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Share Date Roulette</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.25),
+                0 0 0 1px rgba(255, 255, 255, 0.2);
+            max-width: 700px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .header {
+            margin-bottom: 40px;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #6b7280;
+            font-size: 1.1rem;
+            font-weight: 400;
+            margin-bottom: 12px;
+        }
+
+        .schedule-info {
+            padding: 16px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 12px;
+            font-size: 1rem;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .user-section {
+            margin-bottom: 40px;
+            padding: 24px;
+            background: rgba(34, 197, 94, 0.1);
+            border-radius: 16px;
+            border: 2px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .user-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #166534;
+            margin-bottom: 20px;
+        }
+
+        .name-input-group {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .name-input {
+            padding: 14px 20px;
+            border: 2px solid #22c55e;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            min-width: 250px;
+            transition: all 0.3s ease;
+        }
+
+        .name-input:focus {
+            outline: none;
+            border-color: #16a34a;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+        }
+
+        .get-date-button {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3);
+        }
+
+        .get-date-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
+        }
+
+        .get-date-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .wheel-section {
+            margin-bottom: 40px;
+        }
+
+        .wheel-container {
+            position: relative;
+            margin: 30px auto;
+            width: 400px;
+            height: 400px;
+        }
+
+        .wheel {
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            border: 8px solid #fff;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.25),
+                inset 0 0 0 3px rgba(0, 0, 0, 0.1);
+            transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .segment {
+            position: absolute;
+            transition: all 0.3s ease;
+        }
+
+        .segment.taken {
+            opacity: 0.3;
+            filter: grayscale(80%);
+        }
+
+        .center-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-top: 36px solid #ef4444;
+            z-index: 15;
+            filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+        }
+
+        .result {
+            margin: 30px 0;
+            padding: 32px;
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border-radius: 20px;
+            border: 3px solid #0ea5e9;
+            animation: slideIn 0.6s ease-out;
+            transform: scale(1.02);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1.02);
+            }
+        }
+
+        .result-name {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #0369a1;
+            margin-bottom: 12px;
+        }
+
+        .result-date {
+            font-size: 1.8rem;
+            color: #0c4a6e;
+            font-weight: 700;
+            background: rgba(3, 105, 161, 0.1);
+            padding: 16px 24px;
+            border-radius: 16px;
+            margin: 16px 0;
+        }
+
+        .result-message {
+            color: #0c4a6e;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+
+        .assignments-section {
+            margin-top: 40px;
+            padding: 28px;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 20px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .assignments-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #374151;
+            margin-bottom: 24px;
+        }
+
+        .assignments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .assignment-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 22px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            border-left: 5px solid #22c55e;
+            transition: transform 0.2s ease;
+        }
+
+        .assignment-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .assignment-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .assignment-name {
+            font-weight: 700;
+            color: #374151;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .assignment-date {
+            font-size: 0.95rem;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .assignment-icon {
+            font-size: 1.5rem;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 24px;
+            padding: 20px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 16px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .reset-section {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .reset-button {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 2px solid #ef4444;
+            padding: 12px 28px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .reset-button:hover {
+            background: #ef4444;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .empty-message {
+            text-align: center;
+            color: #6b7280;
+            font-size: 1.1rem;
+            font-style: italic;
+            padding: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1 class="title">Knowledge Share Date Roulette</h1>
+            <p class="subtitle">Enter your name and get your random presentation date!</p>
+            <div class="schedule-info">Starting August 11, 2025 - Every Monday for 12 weeks (through October 27, 2025)</div>
+        </div>
+
+        <div class="user-section">
+            <div class="user-title">🎯 Get Your Presentation Date</div>
+            <div class="name-input-group">
+                <input type="text" id="nameInput" class="name-input" placeholder="Enter your full name..." onkeypress="handleKeyPress(event)">
+                <button class="get-date-button" id="getDateBtn" onclick="spinForDate()">
+                    <span id="buttonText">🎲 Get My Date!</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="wheel-section">
+            <div class="wheel-container">
+                <div class="pointer"></div>
+                <div class="wheel" id="wheel"></div>
+                <div class="center-circle">DATES</div>
+            </div>
+
+            <div id="result" class="result hidden">
+                <div class="result-name" id="resultName">John Doe</div>
+                <div class="result-date" id="resultDate">Monday, August 11, 2025</div>
+                <div class="result-message">🎉 Your Knowledge Share presentation is scheduled!</div>
+            </div>
+        </div>
+
+        <div class="assignments-section">
+            <div class="assignments-title">📅 Scheduled Presentations</div>
+            
+            <div class="assignments-grid" id="assignmentsGrid">
+                <div class="empty-message">No presentations scheduled yet. Be the first to get your date!</div>
+            </div>
+            
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-number" id="totalDates">12</div>
+                    <div class="stat-label">Total Dates</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="availableDates">12</div>
+                    <div class="stat-label">Available</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="takenDates">0</div>
+                    <div class="stat-label">Taken</div>
+                </div>
+            </div>
+
+            <div class="reset-section">
+                <button class="reset-button" onclick="resetAll()">🔄 Reset All Assignments</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class DateRoulette {
+            constructor() {
+                // Start date: August 11, 2025 (Monday)
+                this.startDate = new Date('2025-08-11');
+                this.totalWeeks = 12;
+                
+                this.loadData();
+                this.generateDateColors();
+                this.isSpinning = false;
+                
+                this.init();
+            }
+
+            loadData() {
+                const savedData = localStorage.getItem('dateRouletteAssignments');
+                if (savedData) {
+                    this.assignments = JSON.parse(savedData);
+                } else {
+                    this.assignments = {}; // {name: dateString}
+                }
+            }
+
+            saveData() {
+                localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+            }
+
+            generateDateColors() {
+                // 12 completely unique, vibrant colors for each date
+                this.colors = [
+                    '#E74C3C',  // Red
+                    '#3498DB',  // Blue
+                    '#2ECC71',  // Green
+                    '#F39C12',  // Orange
+                    '#9B59B6',  // Purple
+                    '#1ABC9C',  // Turquoise
+                    '#E67E22',  // Dark Orange
+                    '#34495E',  // Dark Blue Gray
+                    '#F1C40F',  // Yellow
+                    '#E91E63',  // Pink
+                    '#8E44AD',  // Dark Purple
+                    '#16A085'   // Dark Turquoise
+                ];
+            }
+
+            init() {
+                this.createWheel();
+                this.updateAssignments();
+                this.updateStats();
+            }
+
+            getAllDates() {
+                const dates = [];
+                console.log('Generating dates starting from:', this.startDate.toDateString());
+                
+                for (let i = 0; i < this.totalWeeks; i++) {
+                    const date = new Date(this.startDate);
+                    date.setDate(date.getDate() + (i * 7));
+                    dates.push(date);
+                    console.log(`Week ${i + 1}: ${date.toDateString()}`);
+                }
+                
+                console.log('Total dates generated:', dates.length);
+                return dates;
+            }
+
+            getAvailableDates() {
+                const allDates = this.getAllDates();
+                const takenDateStrings = Object.values(this.assignments);
+                
+                console.log('All dates:', allDates.map(d => d.toDateString()));
+                console.log('Taken dates:', takenDateStrings);
+                
+                const available = allDates.filter(date => !takenDateStrings.includes(date.toDateString()));
+                console.log('Available dates:', available.map(d => d.toDateString()));
+                
+                return available;
+            }
+
+            formatDate(date) {
+                return date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+
+            formatDateShort(date) {
+                return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+
+            createWheel() {
+                const wheel = document.getElementById('wheel');
+                const availableDates = this.getAvailableDates();
+                
+                console.log('Creating wheel with', availableDates.length, 'available dates');
+                console.log('Available dates:', availableDates.map(d => d.toDateString()));
+                
+                if (availableDates.length === 0) {
+                    wheel.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: #6b7280; font-size: 1.2rem; font-weight: 600; text-align: center; padding: 40px; line-height: 1.4;">🎉 All dates have been assigned!<br>Use reset to start over.</div>';
+                    wheel.style.border = '8px solid #e5e7eb';
+                    wheel.style.background = '#f9fafb';
+                    return;
+                }
+
+                wheel.style.border = '8px solid #fff';
+                wheel.style.background = '';
+                wheel.innerHTML = '';
+                
+                const totalSegments = availableDates.length;
+                const segmentAngle = 360 / totalSegments;
+                
+                console.log('Creating', totalSegments, 'segments with', segmentAngle, 'degrees each');
+                
+                availableDates.forEach((date, index) => {
+                    const segment = document.createElement('div');
+                    segment.className = 'segment';
+                    
+                    // Use conic-gradient to create equal pie slices
+                    const startAngle = index * segmentAngle;
+                    const endAngle = (index + 1) * segmentAngle;
+                    
+                    segment.style.position = 'absolute';
+                    segment.style.width = '100%';
+                    segment.style.height = '100%';
+                    segment.style.clipPath = `polygon(50% 50%, ${50 + 50 * Math.cos((startAngle - 90) * Math.PI / 180)}% ${50 + 50 * Math.sin((startAngle - 90) * Math.PI / 180)}%, ${50 + 50 * Math.cos((endAngle - 90) * Math.PI / 180)}% ${50 + 50 * Math.sin((endAngle - 90) * Math.PI / 180)}%)`;
+                    segment.style.backgroundColor = this.colors[index];
+                    
+                    wheel.appendChild(segment);
+                });
+                
+                // Add text labels AFTER segments, so they're on top
+                availableDates.forEach((date, index) => {
+                    const startAngle = index * segmentAngle;
+                    const endAngle = (index + 1) * segmentAngle;
+                    const textAngle = (startAngle + endAngle) / 2 - 90; // Center of segment
+                    
+                    // Fixed positions that work for any number of segments
+                    let textRadius = 140; // Distance from center
+                    if (totalSegments <= 2) textRadius = 120;
+                    if (totalSegments <= 4) textRadius = 130;
+                    
+                    const textX = 200 + textRadius * Math.cos(textAngle * Math.PI / 180); // 200 = center of 400px wheel
+                    const textY = 200 + textRadius * Math.sin(textAngle * Math.PI / 180);
+                    
+                    const textLabel = document.createElement('div');
+                    textLabel.style.position = 'absolute';
+                    textLabel.style.left = `${textX}px`;
+                    textLabel.style.top = `${textY}px`;
+                    textLabel.style.transform = 'translate(-50%, -50%)';
+                    textLabel.style.fontSize = totalSegments <= 3 ? '20px' : '16px';
+                    textLabel.style.fontWeight = '900';
+                    textLabel.style.color = 'white';
+                    textLabel.style.textShadow = '0 0 8px black, 0 0 16px black, 2px 2px 4px black';
+                    textLabel.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                    textLabel.style.padding = '6px 12px';
+                    textLabel.style.borderRadius = '8px';
+                    textLabel.style.border = '2px solid white';
+                    textLabel.style.textAlign = 'center';
+                    textLabel.style.whiteSpace = 'nowrap';
+                    textLabel.style.zIndex = '20';
+                    textLabel.style.pointerEvents = 'none';
+                    textLabel.textContent = this.formatDateShort(date);
+                    
+                    console.log(`Text ${index + 1}: ${this.formatDateShort(date)} at (${textX}, ${textY})`);
+                    
+                    wheel.appendChild(textLabel);
+                });
+            }
+
+            spinForDate() {
+                const nameInput = document.getElementById('nameInput');
+                const name = nameInput.value.trim();
+                
+                if (!name) {
+                    alert('Please enter your name first!');
+                    nameInput.focus();
+                    return;
+                }
+
+                if (this.assignments[name]) {
+                    alert(`${name} already has a date assigned: ${this.formatDate(new Date(this.assignments[name]))}`);
+                    return;
+                }
+
+                const availableDates = this.getAvailableDates();
+                if (this.isSpinning || availableDates.length === 0) return;
+                
+                this.isSpinning = true;
+                document.getElementById('getDateBtn').disabled = true;
+                document.getElementById('buttonText').textContent = '🎲 Spinning...';
+                document.getElementById('result').classList.add('hidden');
+                
+                // Random selection from available dates
+                const selectedDate = availableDates[Math.floor(Math.random() * availableDates.length)];
+                const selectedIndex = availableDates.indexOf(selectedDate);
+                
+                // Calculate spin animation
+                const segmentAngle = 360 / availableDates.length;
+                const targetAngle = selectedIndex * segmentAngle + (segmentAngle / 2);
+                const spins = 5 + Math.random() * 3; // 5-8 full rotations
+                const totalRotation = (spins * 360) + targetAngle;
+                
+                const wheel = document.getElementById('wheel');
+                wheel.style.transform = `rotate(${totalRotation}deg)`;
+                
+                // Process assignment after animation
+                setTimeout(() => {
+                    // Assign the date to the user
+                    this.assignments[name] = selectedDate.toDateString();
+                    
+                    // Show results
+                    document.getElementById('resultName').textContent = name;
+                    document.getElementById('resultDate').textContent = this.formatDate(selectedDate);
+                    document.getElementById('result').classList.remove('hidden');
+                    
+                    // Clear the input
+                    nameInput.value = '';
+                    
+                    // Update UI
+                    this.saveData();
+                    this.createWheel();
+                    this.updateAssignments();
+                    this.updateStats();
+                    
+                    // Reset button state
+                    this.isSpinning = false;
+                    const getDateBtn = document.getElementById('getDateBtn');
+                    if (this.getAvailableDates().length > 0) {
+                        getDateBtn.disabled = false;
+                        document.getElementById('buttonText').textContent = '🎲 Get My Date!';
+                    } else {
+                        getDateBtn.disabled = true;
+                        document.getElementById('buttonText').textContent = '🎉 All Dates Taken!';
+                    }
+                }, 4000);
+            }
+
+            updateAssignments() {
+                const grid = document.getElementById('assignmentsGrid');
+                const assignments = Object.entries(this.assignments);
+                
+                if (assignments.length === 0) {
+                    grid.innerHTML = '<div class="empty-message">No presentations scheduled yet. Be the first to get your date!</div>';
+                    return;
+                }
+
+                // Sort assignments by date
+                assignments.sort((a, b) => new Date(a[1]) - new Date(b[1]));
+                
+                grid.innerHTML = '';
+                assignments.forEach(([name, dateString]) => {
+                    const date = new Date(dateString);
+                    const item = document.createElement('div');
+                    item.className = 'assignment-item';
+                    item.innerHTML = `
+                        <div class="assignment-info">
+                            <div class="assignment-name">${name}</div>
+                            <div class="assignment-date">${this.formatDate(date)}</div>
+                        </div>
+                        <div class="assignment-icon">📅</div>
+                    `;
+                    grid.appendChild(item);
+                });
+            }
+
+            updateStats() {
+                const totalDates = this.totalWeeks;
+                const takenDates = Object.keys(this.assignments).length;
+                const availableDates = totalDates - takenDates;
+                
+                document.getElementById('totalDates').textContent = totalDates;
+                document.getElementById('takenDates').textContent = takenDates;
+                document.getElementById('availableDates').textContent = availableDates;
+            }
+
+            resetAll() {
+                console.log('Reset button clicked'); // Debug
+                this.assignments = {};
+                this.saveData();
+                this.createWheel();
+                this.updateAssignments();
+                this.updateStats();
+                document.getElementById('result').classList.add('hidden');
+                
+                const getDateBtn = document.getElementById('getDateBtn');
+                getDateBtn.disabled = false;
+                document.getElementById('buttonText').textContent = '🎲 Get My Date!';
+                
+                console.log('Reset completed'); // Debug
+                alert('All assignments have been reset!');
+            }
+        }
+
+        // Initialize the application
+        const roulette = new DateRoulette();
+
+        // Global functions
+        function spinForDate() {
+            roulette.spinForDate();
+        }
+
+        function resetAll() {
+            roulette.resetAll();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                spinForDate();
+            }
+        }
+    </script>
+</body>
+</html>
