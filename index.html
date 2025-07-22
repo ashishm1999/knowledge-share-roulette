@@ -15,7 +15,7 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -422,6 +422,8 @@
 
             <div class="reset-section">
                 <button class="reset-button" onclick="resetAll()">🔄 Reset All Assignments</button>
+                <button class="reset-button" onclick="exportData()" style="background: rgba(34, 197, 94, 0.1); color: #22c55e; border-color: #22c55e; margin-left: 12px;">📤 Export Data</button>
+                <button class="reset-button" onclick="importData()" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: #3b82f6; margin-left: 12px;">📥 Import Data</button>
             </div>
         </div>
     </div>
@@ -441,16 +443,24 @@
             }
 
             loadData() {
+                // Load from localStorage
                 const savedData = localStorage.getItem('dateRouletteAssignments');
                 if (savedData) {
                     this.assignments = JSON.parse(savedData);
                 } else {
-                    this.assignments = {}; // {name: dateString}
+                    // Initialize with CJ's assignment to Aug 11
+                    this.assignments = {
+                        'CJ': new Date('2025-08-11').toDateString()
+                    };
+                    this.saveData(); // Save the initial assignment
                 }
+                
+                console.log('Loaded assignments:', this.assignments);
             }
 
             saveData() {
                 localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                console.log('Data saved to localStorage:', this.assignments);
             }
 
             generateDateColors() {
@@ -472,6 +482,8 @@
             }
 
             init() {
+                console.log('Initializing roulette...');
+                console.log('Current assignments:', this.assignments);
                 this.createWheel();
                 this.updateAssignments();
                 this.updateStats();
@@ -497,10 +509,18 @@
                 const takenDateStrings = Object.values(this.assignments);
                 
                 console.log('All dates:', allDates.map(d => d.toDateString()));
-                console.log('Taken dates:', takenDateStrings);
+                console.log('Taken dates (raw values):', takenDateStrings);
                 
-                const available = allDates.filter(date => !takenDateStrings.includes(date.toDateString()));
+                // Filter out dates that have been assigned
+                const available = allDates.filter(date => {
+                    const dateString = date.toDateString();
+                    const isAvailable = !takenDateStrings.includes(dateString);
+                    console.log(`${dateString}: ${isAvailable ? 'Available' : 'Taken'}`);
+                    return isAvailable;
+                });
+                
                 console.log('Available dates:', available.map(d => d.toDateString()));
+                console.log('Available count:', available.length);
                 
                 return available;
             }
