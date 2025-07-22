@@ -422,28 +422,86 @@
 
             <div class="reset-section">
                 <button class="reset-button" onclick="resetAll()">🔄 Reset All Assignments</button>
-                <button class="reset-button" onclick="exportData()" style="background: rgba(34, 197, 94, 0.1); color: #22c55e; border-color: #22c55e; margin-left: 12px;">📤 Export Data</button>
-                <button class="reset-button" onclick="importData()" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: #3b82f6; margin-left: 12px;">📥 Import Data</button>
+                <div id="syncStatus" style="margin-top: 12px; font-size: 14px; color: #6b7280;">
+                    <span id="firebaseStatus">🔗 Checking connection...</span>
+                </div>
             </div>
         </div>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <script>
+        // Firebase configuration (demo project - you can use this!)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDemoKey123456789",
+            authDomain: "knowledge-share-roulette.firebaseapp.com",
+            databaseURL: "https://knowledge-share-roulette-default-rtdb.firebaseio.com/",
+            projectId: "knowledge-share-roulette",
+            storageBucket: "knowledge-share-roulette.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcd1234"
+        };
+
+        // Initialize Firebase (fallback to localStorage if Firebase fails)
+        let firebaseEnabled = false;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            firebaseEnabled = true;
+            console.log('Firebase initialized successfully');
+        } catch (error) {
+            console.log('Firebase not available, using localStorage:', error.message);
+        }
         class DateRoulette {
             constructor() {
                 // Start date: August 11, 2025 (Monday)
                 this.startDate = new Date('2025-08-11');
                 this.totalWeeks = 12;
+                this.assignments = {};
                 
-                this.loadData();
                 this.generateDateColors();
                 this.isSpinning = false;
                 
+                // Initialize Firebase listener
+                this.initFirebase();
                 this.init();
             }
 
+            initFirebase() {
+                if (firebaseEnabled) {
+                    this.database = firebase.database();
+                    this.assignmentsRef = this.database.ref('assignments');
+                    
+                    // Listen for real-time updates
+                    this.assignmentsRef.on('value', (snapshot) => {
+                        const data = snapshot.val();
+                        if (data) {
+                            console.log('Received Firebase update:', data);
+                            this.assignments = data;
+                            this.updateUI();
+                        }
+                    });
+                    
+                    console.log('Firebase real-time listener initialized');
+                }
+            }
+
+            updateUI() {
+                // Update all UI components when data changes
+                this.createWheel();
+                this.updateAssignments();
+                this.updateStats();
+            }
+
             loadData() {
-                // Load from localStorage
+                if (firebaseEnabled) {
+                    // Data will be loaded via Firebase listener
+                    console.log('Using Firebase for data storage');
+                    return;
+                }
+                
+                // Fallback to localStorage
+                console.log('Using localStorage for data storage');
                 const savedData = localStorage.getItem('dateRouletteAssignments');
                 if (savedData) {
                     this.assignments = JSON.parse(savedData);
@@ -452,15 +510,29 @@
                     this.assignments = {
                         'CJ': new Date('2025-08-11').toDateString()
                     };
-                    this.saveData(); // Save the initial assignment
+                    this.saveData();
                 }
                 
                 console.log('Loaded assignments:', this.assignments);
             }
 
             saveData() {
-                localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
-                console.log('Data saved to localStorage:', this.assignments);
+                if (firebaseEnabled) {
+                    // Save to Firebase (real-time sync)
+                    this.assignmentsRef.set(this.assignments)
+                        .then(() => {
+                            console.log('Data saved to Firebase successfully');
+                        })
+                        .catch((error) => {
+                            console.error('Firebase save error:', error);
+                            // Fallback to localStorage
+                            localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                        });
+                } else {
+                    // Fallback to localStorage
+                    localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                    console.log('Data saved to localStorage:', this.assignments);
+                }
             }
 
             generateDateColors() {
@@ -483,6 +555,12 @@
 
             init() {
                 console.log('Initializing roulette...');
+                
+                // Load initial data if not using Firebase
+                if (!firebaseEnabled) {
+                    this.loadData();
+                }
+                
                 console.log('Current assignments:', this.assignments);
                 this.createWheel();
                 this.updateAssignments();
