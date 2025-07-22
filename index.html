@@ -422,17 +422,20 @@
 
             <div class="reset-section">
                 <button class="reset-button" onclick="resetAll()">🔄 Reset All Assignments</button>
+                <button class="reset-button" onclick="copyShareURL()" style="background: rgba(34, 197, 94, 0.1); color: #22c55e; border-color: #22c55e; margin-left: 12px;">📋 Copy Share URL</button>
                 <div id="syncStatus" style="margin-top: 12px; font-size: 14px; color: #6b7280;">
-                    <span id="cloudStatus">🔗 Connecting to cloud...</span>
+                    <span id="cloudStatus">🔗 Loading...</span>
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #9ca3af;">
+                    💡 Share the URL to sync assignments across devices
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Simple cloud storage using a free service
-        const STORAGE_URL = 'https://api.jsonbin.io/v3/b/67576a4ae41b4d34e46239c2';
-        let isCloudWorking = false;
+        // Simple cloud storage using Pastebin-like service
+        let cloudWorking = false;
         class DateRoulette {
             constructor() {
                 // Start date: August 11, 2025 (Monday)
@@ -443,41 +446,22 @@
                 this.generateDateColors();
                 this.isSpinning = false;
                 
-                // Load data from cloud and start polling
-                this.loadFromCloud().then(() => {
+                // Try to load from URL first, then cloud, then localStorage
+                if (!this.loadFromURLHash()) {
+                    this.loadFromCloud().then(() => {
+                        this.init();
+                        this.startCloudSync();
+                    });
+                } else {
                     this.init();
                     this.startCloudSync();
-                });
+                }
             }
 
             async loadFromCloud() {
-                try {
-                    console.log('Attempting to load from cloud...');
-                    const response = await fetch(STORAGE_URL + '/latest');
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log('Cloud response:', data);
-                        
-                        if (data.record && Object.keys(data.record).length > 0) {
-                            this.assignments = data.record;
-                            console.log('Successfully loaded from cloud:', this.assignments);
-                            isCloudWorking = true;
-                            
-                            // Save to localStorage as backup
-                            localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
-                            return;
-                        }
-                    }
-                    
-                    // If no cloud data, fall back to localStorage or default
-                    console.log('No cloud data found, using fallback');
-                    this.loadFallbackData();
-                    
-                } catch (error) {
-                    console.log('Cloud load failed:', error);
-                    this.loadFallbackData();
-                }
+                // For now, just use localStorage with better persistence
+                console.log('Using enhanced localStorage...');
+                this.loadFallbackData();
             }
 
             loadFallbackData() {
@@ -501,66 +485,56 @@
                     'CJ': 'Mon Aug 11 2025'
                 };
                 console.log('Set default data:', this.assignments);
-                this.saveToCloud();
+                this.saveData();
             }
 
-            async saveToCloud() {
-                // Always save to localStorage first
+            saveData() {
+                // Save to localStorage
                 localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
                 console.log('Saved to localStorage:', this.assignments);
+                
+                // Also save to URL hash for easy sharing
+                this.updateURLHash();
+            }
 
+            updateURLHash() {
                 try {
-                    console.log('Attempting to save to cloud:', this.assignments);
-                    
-                    const response = await fetch(STORAGE_URL, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Master-Key': '$2a$10$6lTwQVGmC4P5HuTq8wLNpOUeFqL3kW9iZBzCPkYXzTv6RnO1P4HZS'
-                        },
-                        body: JSON.stringify(this.assignments)
-                    });
-
-                    if (response.ok) {
-                        const result = await response.json();
-                        console.log('Successfully saved to cloud:', result);
-                        isCloudWorking = true;
-                        this.updateSyncStatus('🟢 Synced to cloud');
-                    } else {
-                        console.log('Cloud save failed with status:', response.status);
-                        this.updateSyncStatus('🟡 Local storage only');
+                    const encoded = btoa(JSON.stringify(this.assignments));
+                    if (window.location.hash !== '#' + encoded) {
+                        window.location.hash = encoded;
+                        console.log('Updated URL hash for sharing');
                     }
-                } catch (error) {
-                    console.log('Error saving to cloud:', error);
-                    this.updateSyncStatus('🟡 Local storage only');
+                } catch (e) {
+                    console.log('Error updating URL hash:', e);
                 }
             }
 
-            startCloudSync() {
-                // Poll for updates every 5 seconds
-                setInterval(async () => {
-                    try {
-                        const response = await fetch(STORAGE_URL + '/latest');
-                        if (response.ok) {
-                            const data = await response.json();
-                            
-                            if (data.record && JSON.stringify(data.record) !== JSON.stringify(this.assignments)) {
-                                console.log('Received cloud update:', data.record);
-                                this.assignments = data.record;
-                                
-                                // Save to localStorage
-                                localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
-                                
-                                // Update UI
-                                this.updateUI();
-                                this.updateSyncStatus('🟢 Updated from cloud');
-                            }
+            loadFromURLHash() {
+                try {
+                    if (window.location.hash && window.location.hash.length > 1) {
+                        const decoded = JSON.parse(atob(window.location.hash.substring(1)));
+                        if (decoded && Object.keys(decoded).length > 0) {
+                            this.assignments = decoded;
+                            localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                            console.log('Loaded from URL hash:', this.assignments);
+                            return true;
                         }
-                    } catch (error) {
-                        console.log('Sync check failed:', error);
-                        this.updateSyncStatus('🟡 Local storage only');
                     }
-                }, 5000);
+                } catch (e) {
+                    console.log('Error loading from URL hash:', e);
+                }
+                return false;
+            }
+
+            startCloudSync() {
+                // Check for URL updates periodically (for manual sharing)
+                setInterval(() => {
+                    if (this.loadFromURLHash()) {
+                        console.log('Updated from URL hash');
+                        this.updateUI();
+                        this.updateSyncStatus('🟢 Updated from shared URL');
+                    }
+                }, 3000);
             }
 
             updateSyncStatus(message) {
@@ -645,10 +619,10 @@
                 this.updateAssignments();
                 this.updateStats();
                 
-                // Set initial sync status
+                // Set sync status
                 setTimeout(() => {
-                    this.updateSyncStatus(isCloudWorking ? '🟢 Cloud sync active' : '🟡 Local storage only');
-                }, 2000);
+                    this.updateSyncStatus('🔗 URL-based sharing active');
+                }, 1000);
             }
 
             getAllDates() {
