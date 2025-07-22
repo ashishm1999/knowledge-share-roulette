@@ -423,35 +423,18 @@
             <div class="reset-section">
                 <button class="reset-button" onclick="resetAll()">🔄 Reset All Assignments</button>
                 <div id="syncStatus" style="margin-top: 12px; font-size: 14px; color: #6b7280;">
-                    <span id="firebaseStatus">🔗 Checking connection...</span>
+                    <span id="cloudStatus">🔗 Connecting to cloud...</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <script>
-        // Firebase configuration (demo project - you can use this!)
-        const firebaseConfig = {
-            apiKey: "AIzaSyDemoKey123456789",
-            authDomain: "knowledge-share-roulette.firebaseapp.com",
-            databaseURL: "https://knowledge-share-roulette-default-rtdb.firebaseio.com/",
-            projectId: "knowledge-share-roulette",
-            storageBucket: "knowledge-share-roulette.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcd1234"
-        };
-
-        // Initialize Firebase (fallback to localStorage if Firebase fails)
-        let firebaseEnabled = false;
-        try {
-            firebase.initializeApp(firebaseConfig);
-            firebaseEnabled = true;
-            console.log('Firebase initialized successfully');
-        } catch (error) {
-            console.log('Firebase not available, using localStorage:', error.message);
-        }
+        // Use JSONBin.io for real-time data sharing (no setup required)
+        const API_BASE = 'https://api.jsonbin.io/v3/b';
+        const BIN_ID = '6756c8d1e41b4d34e4621b33'; // Public bin for knowledge share roulette
+        
+        let cloudSyncEnabled = true;
         class DateRoulette {
             constructor() {
                 // Start date: August 11, 2025 (Monday)
@@ -462,27 +445,115 @@
                 this.generateDateColors();
                 this.isSpinning = false;
                 
-                // Initialize Firebase listener
-                this.initFirebase();
-                this.init();
+                // Load data from cloud and start polling
+                this.loadFromCloud().then(() => {
+                    this.init();
+                    this.startCloudSync();
+                });
             }
 
-            initFirebase() {
-                if (firebaseEnabled) {
-                    this.database = firebase.database();
-                    this.assignmentsRef = this.database.ref('assignments');
+            async loadFromCloud() {
+                try {
+                    console.log('Loading data from cloud...');
+                    const response = await fetch(`${API_BASE}/${BIN_ID}/latest`);
                     
-                    // Listen for real-time updates
-                    this.assignmentsRef.on('value', (snapshot) => {
-                        const data = snapshot.val();
-                        if (data) {
-                            console.log('Received Firebase update:', data);
-                            this.assignments = data;
-                            this.updateUI();
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.record && typeof data.record === 'object') {
+                            this.assignments = data.record;
+                            console.log('Loaded from cloud:', this.assignments);
+                            
+                            // Save to localStorage as backup
+                            localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
                         }
+                    } else {
+                        console.log('Cloud data not available, using localStorage');
+                        this.loadFromLocalStorage();
+                    }
+                } catch (error) {
+                    console.log('Error loading from cloud, using localStorage:', error);
+                    this.loadFromLocalStorage();
+                    cloudSyncEnabled = false;
+                }
+            }
+
+            loadFromLocalStorage() {
+                const savedData = localStorage.getItem('dateRouletteAssignments');
+                if (savedData) {
+                    this.assignments = JSON.parse(savedData);
+                } else {
+                    // Initialize with CJ's assignment to Aug 11
+                    this.assignments = {
+                        'CJ': new Date('2025-08-11').toDateString()
+                    };
+                }
+                console.log('Loaded from localStorage:', this.assignments);
+            }
+
+            async saveToCloud() {
+                if (!cloudSyncEnabled) {
+                    this.saveToLocalStorage();
+                    return;
+                }
+
+                try {
+                    console.log('Saving to cloud:', this.assignments);
+                    const response = await fetch(`${API_BASE}/${BIN_ID}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.assignments)
                     });
-                    
-                    console.log('Firebase real-time listener initialized');
+
+                    if (response.ok) {
+                        console.log('Successfully saved to cloud');
+                        localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                    } else {
+                        console.log('Cloud save failed, using localStorage');
+                        this.saveToLocalStorage();
+                    }
+                } catch (error) {
+                    console.log('Error saving to cloud:', error);
+                    this.saveToLocalStorage();
+                }
+            }
+
+            saveToLocalStorage() {
+                localStorage.setItem('dateRouletteAssignments', JSON.stringify(this.assignments));
+                console.log('Saved to localStorage:', this.assignments);
+            }
+
+            startCloudSync() {
+                if (!cloudSyncEnabled) return;
+                
+                // Poll for updates every 3 seconds
+                setInterval(async () => {
+                    try {
+                        const response = await fetch(`${API_BASE}/${BIN_ID}/latest`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.record && JSON.stringify(data.record) !== JSON.stringify(this.assignments)) {
+                                console.log('Received update from cloud:', data.record);
+                                this.assignments = data.record;
+                                this.updateUI();
+                                
+                                // Update status indicator
+                                this.updateSyncStatus('🟢 Synced with cloud');
+                            }
+                        }
+                    } catch (error) {
+                        console.log('Sync check failed:', error);
+                        this.updateSyncStatus('🟡 Using local storage');
+                    }
+                }, 3000);
+            }
+
+            updateSyncStatus(message) {
+                const statusElement = document.getElementById('cloudStatus');
+                if (statusElement) {
+                    statusElement.textContent = message;
+                    statusElement.style.color = message.includes('🟢') ? '#22c55e' : '#f59e0b';
                 }
             }
 
@@ -555,16 +626,15 @@
 
             init() {
                 console.log('Initializing roulette...');
-                
-                // Load initial data if not using Firebase
-                if (!firebaseEnabled) {
-                    this.loadData();
-                }
-                
                 console.log('Current assignments:', this.assignments);
                 this.createWheel();
                 this.updateAssignments();
                 this.updateStats();
+                
+                // Set initial sync status
+                setTimeout(() => {
+                    this.updateSyncStatus(cloudSyncEnabled ? '🟢 Cloud sync active' : '🟡 Using local storage');
+                }, 1000);
             }
 
             getAllDates() {
